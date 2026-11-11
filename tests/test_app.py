@@ -1,4 +1,6 @@
+import json
 import os
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -8,10 +10,17 @@ from streamlit.testing.v1 import AppTest
 
 class ChatAppTests(unittest.TestCase):
     def test_app_renders_a_new_session_chat(self) -> None:
-        with patch.dict(os.environ, {"OPENROUTER_API_KEY": ""}):
-            app = AppTest.from_file(Path(__file__).resolve().parents[1] / "app.py").run(
-                timeout=30
-            )
+        with tempfile.TemporaryDirectory() as chat_dir:
+            with patch.dict(
+                os.environ,
+                {
+                    "OPENROUTER_API_KEY": "",
+                    "CHAT_STORAGE_DIR": chat_dir,
+                },
+            ):
+                app = AppTest.from_file(
+                    Path(__file__).resolve().parents[1] / "app.py"
+                ).run(timeout=30)
 
         self.assertFalse(app.exception)
         self.assertTrue(app.title)
@@ -24,11 +33,18 @@ class ChatAppTests(unittest.TestCase):
         )
 
     def test_new_chat_keeps_the_existing_chat_separate(self) -> None:
-        with patch.dict(os.environ, {"OPENROUTER_API_KEY": ""}):
-            app = AppTest.from_file(
-                Path(__file__).resolve().parents[1] / "app.py"
-            ).run(timeout=30)
-            app.sidebar.button[0].click().run(timeout=30)
+        with tempfile.TemporaryDirectory() as chat_dir:
+            with patch.dict(
+                os.environ,
+                {
+                    "OPENROUTER_API_KEY": "",
+                    "CHAT_STORAGE_DIR": chat_dir,
+                },
+            ):
+                app = AppTest.from_file(
+                    Path(__file__).resolve().parents[1] / "app.py"
+                ).run(timeout=30)
+                app.sidebar.button[0].click().run(timeout=30)
 
         self.assertFalse(app.exception)
         self.assertEqual(len(app.session_state["chats"]), 2)
@@ -38,11 +54,19 @@ class ChatAppTests(unittest.TestCase):
         )
 
     def test_missing_api_key_is_shown_after_a_message(self) -> None:
-        with patch.dict(os.environ, {"OPENROUTER_API_KEY": ""}):
-            app = AppTest.from_file(Path(__file__).resolve().parents[1] / "app.py").run(
-                timeout=30
-            )
-            app.chat_input[0].set_value("Hello").run(timeout=30)
+        with tempfile.TemporaryDirectory() as chat_dir:
+            with patch.dict(
+                os.environ,
+                {
+                    "OPENROUTER_API_KEY": "",
+                    "CHAT_STORAGE_DIR": chat_dir,
+                },
+            ):
+                app = AppTest.from_file(
+                    Path(__file__).resolve().parents[1] / "app.py"
+                ).run(timeout=30)
+                app.chat_input[0].set_value("Hello").run(timeout=30)
+                saved_file_count = len(list(Path(chat_dir).glob("*.json")))
 
         self.assertFalse(app.exception)
         self.assertTrue(
@@ -52,6 +76,92 @@ class ChatAppTests(unittest.TestCase):
             app.session_state["active_chat_id"]
         ]["messages"]
         self.assertEqual(messages, [{"role": "user", "content": "Hello"}])
+        self.assertEqual(saved_file_count, 1)
+
+    def test_saved_chat_is_restored_in_a_new_session(self) -> None:
+        with tempfile.TemporaryDirectory() as chat_dir:
+            with patch.dict(
+                os.environ,
+                {
+                    "OPENROUTER_API_KEY": "",
+                    "CHAT_STORAGE_DIR": chat_dir,
+                },
+            ):
+                app = AppTest.from_file(
+                    Path(__file__).resolve().parents[1] / "app.py"
+                ).run(timeout=30)
+                app.chat_input[0].set_value("Hello").run(timeout=30)
+                chat_id = app.session_state["active_chat_id"]
+                saved = json.loads(
+                    next(Path(chat_dir).glob("*.json")).read_text(
+                        encoding="utf-8"
+                    )
+                )
+                app = AppTest.from_file(
+                    Path(__file__).resolve().parents[1] / "app.py"
+                ).run(timeout=30)
+
+        self.assertFalse(app.exception)
+        self.assertEqual(app.session_state["active_chat_id"], chat_id)
+        self.assertEqual(
+            app.session_state["chats"][chat_id]["messages"],
+            [{"role": "user", "content": "Hello"}],
+        )
+        self.assertEqual(saved["id"], chat_id)
+
+    def test_deleting_current_chat_removes_its_saved_file(self) -> None:
+        with tempfile.TemporaryDirectory() as chat_dir:
+            with patch.dict(
+                os.environ,
+                {
+                    "OPENROUTER_API_KEY": "",
+                    "CHAT_STORAGE_DIR": chat_dir,
+                },
+            ):
+                app = AppTest.from_file(
+                    Path(__file__).resolve().parents[1] / "app.py"
+                ).run(timeout=30)
+                app.chat_input[0].set_value("Hello").run(timeout=30)
+                delete_button = next(
+                    button
+                    for button in app.sidebar.button
+                    if button.label == "Delete current chat"
+                )
+                delete_button.click().run(timeout=30)
+                remaining_file_count = len(
+                    list(Path(chat_dir).glob("*.json"))
+                )
+
+        self.assertFalse(app.exception)
+        self.assertEqual(remaining_file_count, 0)
+
+    def test_system_prompt_is_applied_when_save_is_clicked(self) -> None:
+        with tempfile.TemporaryDirectory() as chat_dir:
+            with patch.dict(
+                os.environ,
+                {
+                    "OPENROUTER_API_KEY": "",
+                    "CHAT_STORAGE_DIR": chat_dir,
+                },
+            ):
+                app = AppTest.from_file(
+                    Path(__file__).resolve().parents[1] / "app.py"
+                ).run(timeout=30)
+                updated_prompt = "Answer in concise bullet points."
+                app.sidebar.text_area[0].set_value(updated_prompt).run(
+                    timeout=30
+                )
+                prompt_before_save = app.session_state["system_prompt"]
+                save_button = next(
+                    button
+                    for button in app.sidebar.button
+                    if button.label == "Save"
+                )
+                save_button.click().run(timeout=30)
+
+        self.assertFalse(app.exception)
+        self.assertNotEqual(prompt_before_save, updated_prompt)
+        self.assertEqual(app.session_state["system_prompt"], updated_prompt)
 
 
 if __name__ == "__main__":

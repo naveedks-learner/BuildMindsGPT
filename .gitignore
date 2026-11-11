@@ -1,6 +1,7 @@
 .venv/
 .venv-*/
 .data/
+/chats/*.json
 .env
 __pycache__/
 *.py[cod]

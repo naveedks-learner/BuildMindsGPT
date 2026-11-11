@@ -1,6 +1,10 @@
+import json
 import os
 import uuid
 from collections.abc import Iterator
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import TypedDict
 
 import streamlit as st
 from openai import OpenAI, OpenAIError
@@ -9,20 +13,38 @@ from streamlit.errors import StreamlitSecretNotFoundError
 
 MODEL = "openai/gpt-4o-mini"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+CHATS_DIR = Path(
+    os.environ.get("CHAT_STORAGE_DIR", Path(__file__).parent / "chats")
+)
 DEFAULT_SYSTEM_PROMPT = (
     "You are a helpful, accurate assistant. Be clear about uncertainty."
 )
+
+
+class ChatMessage(TypedDict):
+    role: str
+    content: str
+
+
+class Chat(TypedDict):
+    title: str
+    messages: list[ChatMessage]
+    updated_at: str
+
 
 st.set_page_config(page_title="BuildmindsGPT", page_icon="💬")
 
 
 def get_api_key() -> str:
-    """Read the OpenRouter key from Streamlit secrets or local environment."""
+    """Read an explicit local environment override or Streamlit secret."""
+    environment_key = os.environ.get("OPENROUTER_API_KEY")
+    if environment_key is not None:
+        return environment_key.strip()
     try:
         secret_key = str(st.secrets.get("OPENROUTER_API_KEY", "")).strip()
     except StreamlitSecretNotFoundError:
         secret_key = ""
-    return secret_key or os.environ.get("OPENROUTER_API_KEY", "").strip()
+    return secret_key
 
 
 def stream_response(
@@ -47,26 +69,123 @@ def stream_response(
             yield text
 
 
+def chat_path(chat_id: str) -> Path:
+    """Return the JSON file for a generated chat ID."""
+    return CHATS_DIR / f"{chat_id}.json"
+
+
+def save_chat(chat_id: str, chat: Chat) -> None:
+    """Persist a conversation using an atomic file replacement."""
+    CHATS_DIR.mkdir(parents=True, exist_ok=True)
+    chat["updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    data = {
+        "id": chat_id,
+        "title": chat["title"],
+        "updated_at": chat["updated_at"],
+        "messages": chat["messages"],
+    }
+    path = chat_path(chat_id)
+    temporary_path = path.with_suffix(".tmp")
+    temporary_path.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    temporary_path.replace(path)
+
+
+def load_saved_chats() -> tuple[dict[str, Chat], list[str]]:
+    """Load valid JSON conversations and report files that could not be read."""
+    chats: dict[str, Chat] = {}
+    invalid_files: list[str] = []
+    if not CHATS_DIR.exists():
+        return chats, invalid_files
+
+    for path in CHATS_DIR.glob("*.json"):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                raise ValueError("Chat data must be an object.")
+
+            chat_id = data.get("id", path.stem)
+            title = data.get("title", "New chat")
+            updated_at = data.get("updated_at", "")
+            raw_messages = data.get("messages", [])
+            if (
+                not isinstance(chat_id, str)
+                or chat_id != path.stem
+                or not isinstance(title, str)
+                or not isinstance(updated_at, str)
+                or not isinstance(raw_messages, list)
+            ):
+                raise ValueError("Chat data has an invalid shape.")
+
+            messages: list[ChatMessage] = []
+            for message in raw_messages:
+                if (
+                    not isinstance(message, dict)
+                    or not isinstance(message.get("role"), str)
+                    or message["role"] not in {"user", "assistant"}
+                    or not isinstance(message.get("content"), str)
+                ):
+                    raise ValueError("A chat message has an invalid shape.")
+                messages.append(
+                    {
+                        "role": message["role"],
+                        "content": message["content"],
+                    }
+                )
+
+            chats[chat_id] = {
+                "title": title,
+                "messages": messages,
+                "updated_at": updated_at,
+            }
+        except (OSError, json.JSONDecodeError, ValueError):
+            invalid_files.append(path.name)
+
+    return dict(
+        sorted(
+            chats.items(),
+            key=lambda item: item[1]["updated_at"],
+            reverse=True,
+        )
+    ), invalid_files
+
+
 def start_new_chat() -> None:
     chat_id = str(uuid.uuid4())
     st.session_state.chats[chat_id] = {
         "title": "New chat",
         "messages": [],
+        "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
     st.session_state.active_chat_id = chat_id
 
 
+def delete_saved_chat(chat_id: str) -> None:
+    """Remove a conversation file if it has been saved."""
+    path = chat_path(chat_id)
+    path.unlink(missing_ok=True)
+
+
 def main() -> None:
-    st.session_state.setdefault("chats", {})
+    if "chats" not in st.session_state:
+        chats, invalid_files = load_saved_chats()
+        st.session_state.chats = chats
+        st.session_state.invalid_chat_files = invalid_files
+    st.session_state.setdefault("invalid_chat_files", [])
     st.session_state.setdefault("temperature", 0.7)
     st.session_state.setdefault("max_tokens", 1024)
     st.session_state.setdefault("context_messages", 20)
     st.session_state.setdefault("streaming", True)
     st.session_state.setdefault("system_prompt", DEFAULT_SYSTEM_PROMPT)
+    st.session_state.setdefault(
+        "system_prompt_draft", st.session_state.system_prompt
+    )
 
     if not st.session_state.chats:
         start_new_chat()
-    if st.session_state.active_chat_id not in st.session_state.chats:
+    if st.session_state.get("active_chat_id") not in st.session_state.chats:
         st.session_state.active_chat_id = next(iter(st.session_state.chats))
 
     st.sidebar.title("BuildmindsGPT")
@@ -77,7 +196,11 @@ def main() -> None:
         st.rerun()
 
     st.sidebar.subheader("History")
-    for chat_id, chat in reversed(list(st.session_state.chats.items())):
+    for chat_id, chat in sorted(
+        st.session_state.chats.items(),
+        key=lambda item: item[1]["updated_at"],
+        reverse=True,
+    ):
         if st.sidebar.button(
             chat["title"],
             key=f"chat-{chat_id}",
@@ -95,14 +218,19 @@ def main() -> None:
     active_chat = st.session_state.chats[active_chat_id]
 
     if st.sidebar.button("Delete current chat", width="stretch"):
-        del st.session_state.chats[active_chat_id]
-        if not st.session_state.chats:
-            start_new_chat()
+        try:
+            delete_saved_chat(active_chat_id)
+        except OSError as error:
+            st.error(f"Could not delete the saved chat: {error}")
         else:
-            st.session_state.active_chat_id = next(
-                iter(st.session_state.chats)
-            )
-        st.rerun()
+            del st.session_state.chats[active_chat_id]
+            if not st.session_state.chats:
+                start_new_chat()
+            else:
+                st.session_state.active_chat_id = next(
+                    iter(st.session_state.chats)
+                )
+            st.rerun()
 
     with st.sidebar.expander("Settings"):
         st.slider(
@@ -129,18 +257,32 @@ def main() -> None:
             help="Limits how much chat history is sent with each request.",
         )
         st.toggle("Stream responses", key="streaming")
-        st.text_area(
-            "System prompt",
-            key="system_prompt",
-            height=120,
-            help="This instruction guides the assistant's replies.",
-        )
+        prompt_column, save_column = st.columns([4, 1], vertical_alignment="top")
+        with prompt_column:
+            st.text_area(
+                "System prompt",
+                key="system_prompt_draft",
+                height=120,
+                help="Edit the prompt, then click Save to apply it.",
+            )
+        with save_column:
+            if st.button("Save", key="save_system_prompt", use_container_width=True):
+                st.session_state.system_prompt = (
+                    st.session_state.system_prompt_draft
+                )
+                st.caption("Saved for this session.")
         st.caption("Use Settings > Theme in the app menu to switch appearance.")
 
     st.title("BuildmindsGPT")
     st.caption(
-        "A beginner chat app. History lasts for this browser session only."
+        "Chat history is saved in local JSON files. Everyone using this "
+        "deployment shares the same history."
     )
+    if st.session_state.invalid_chat_files:
+        st.warning(
+            "Some saved chats could not be loaded: "
+            + ", ".join(st.session_state.invalid_chat_files)
+        )
 
     for message in active_chat["messages"]:
         with st.chat_message(message["role"]):
@@ -156,6 +298,11 @@ def main() -> None:
     active_chat["messages"].append({"role": "user", "content": prompt})
     if len(active_chat["messages"]) == 1:
         active_chat["title"] = prompt.strip().replace("\n", " ")[:36]
+    try:
+        save_chat(active_chat_id, active_chat)
+    except OSError as error:
+        st.error(f"Could not save chat history: {error}")
+        return
 
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -216,6 +363,10 @@ def main() -> None:
     active_chat["messages"].append(
         {"role": "assistant", "content": answer}
     )
+    try:
+        save_chat(active_chat_id, active_chat)
+    except OSError as error:
+        st.error(f"Could not save chat history: {error}")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-# Build a chat app: student guide
+# Student Dev Guide: build a chat app
 
 This workshop builds a small ChatGPT-style app with Streamlit and OpenRouter.
 You will create the code yourself with an AI coding assistant, run it locally,
@@ -7,15 +7,17 @@ put the project on GitHub, and deploy it to Streamlit Community Cloud.
 ## What you will build
 
 - A chat screen with multiple chats and a history list.
-- `st.session_state` to keep chats while a browser session is active.
+- `st.session_state` for active chats and one JSON file per conversation in a
+  local `chats/` folder.
 - OpenRouter's Chat Completions API using `openai/gpt-4o-mini`.
 - A system prompt, temperature, maximum output tokens, recent-message context
   limit, and a streaming on/off switch.
 - A GitHub repository and a deployed Streamlit app.
 
-This first version has **temporary, per-session chat history**. Refreshing the
-page or ending the session may clear it. There are no accounts, database, or file
-uploads; those are optional follow-on lessons.
+Chat history is restored from JSON files after a browser refresh. All visitors
+to the same deployment share these files and can see or delete the same chats.
+Streamlit Community Cloud may clear local files when the app restarts or is
+redeployed. There are no accounts, database, or file uploads in this demo.
 
 ## Before the workshop
 
@@ -94,23 +96,25 @@ assistant any errors you see, but remove API keys and other secrets first.
 > OpenAI-compatible Chat Completions API with model `openai/gpt-4o-mini`.
 > First give me a short implementation plan and explain each piece in plain
 > language. Use `st.session_state` for a dictionary of conversations and the
-> active conversation ID. Do not add a database, user accounts, file uploads,
-> custom CSS, or extra packages. Chat history only needs to last for the current
-> Streamlit browser session. Keep the API key out of source code.
+> active conversation ID. Save each conversation as a JSON file in a local
+> `chats/` folder and restore those files when a new session starts. Do not add
+> a database, user accounts, file uploads, custom CSS, or extra packages. Keep
+> the API key out of source code. Explain that everyone using one deployment
+> shares chat history and Streamlit Cloud may clear local files on restart.
 
 ### Prompt 2 — Build chat and history
 
 > Now create `app.py` from that plan. Include a chat input and user/assistant
 > message display with `st.chat_message`. Add a sidebar button to start a new
 > chat, buttons to switch between chat histories, and a way to delete the
-> current chat. Store all conversation state only in `st.session_state`.
-> Initialize state safely so the app reruns without losing the current session.
-> Explain the code after showing it.
+> current chat. Keep active state in `st.session_state`, and load/save each
+> conversation as JSON under `chats/` so it returns after a refresh. Initialize
+> state safely so Streamlit reruns work. Explain the code after showing it.
 
 ### Prompt 3 — Connect OpenRouter safely
 
-> Add a function that reads `OPENROUTER_API_KEY` from `st.secrets` first and
-> from the local environment as a development fallback. Use
+> Add a function that reads `OPENROUTER_API_KEY` from the local environment
+> when set, otherwise from `st.secrets`. Use
 > `OpenAI(api_key=..., base_url="https://openrouter.ai/api/v1")` and call
 > `client.chat.completions.create` with model `openai/gpt-4o-mini`. Send a
 > configurable system prompt followed by recent conversation messages. Show a
@@ -123,17 +127,20 @@ assistant any errors you see, but remove API keys and other secrets first.
 > recent chat messages sent as context, and whether responses stream. Use
 > `st.write_stream` for streaming and the same Chat Completions API with
 > `stream=True`. When streaming is off, make a normal non-streaming request.
-> Keep the code beginner-readable and explain how the settings affect the
-> request.
+> Put a Save button next to the system prompt editor; keep edits as a draft
+> until Save is clicked, then use the saved prompt for future requests in this
+> session. Keep the code beginner-readable and explain how the settings affect
+> the request.
 
 ### Prompt 5 — Review and test
 
 > Review my `app.py` and `requirements.txt` for beginner-level correctness.
 > Check that messages survive Streamlit reruns within one browser session, that
 > separate chats do not mix, and that only the configured recent messages are
-> sent to the model. Check that the API key cannot be committed accidentally.
+> sent to the model. Check that system-prompt edits are not applied until Save
+> is clicked. Check that the API key cannot be committed accidentally.
 > List any problems first, then suggest the smallest corrections. Do not add a
-> database or change the temporary-history design.
+> database or change the JSON-file persistence design.
 
 ### Prompt 6 — Ask for help with an error
 
@@ -159,6 +166,7 @@ assistant any errors you see, but remove API keys and other secrets first.
    .env
    __pycache__/
    .venv/
+   chats/*.json
    ```
 
 4. Check that `.streamlit/secrets.toml` is not shown among files you intend to
@@ -178,7 +186,7 @@ assistant any errors you see, but remove API keys and other secrets first.
 4. Start another chat, switch back to the first, and confirm the messages remain
    separate.
 5. Change a setting and test again.
-6. Refresh the browser to observe that session-only history may be cleared.
+6. Refresh the browser and confirm saved chats return.
 7. Stop the local app with **Ctrl+C** in the terminal.
 
 If you see a missing-key error, check the spelling and location of
@@ -199,7 +207,8 @@ for help.
 5. Optionally select **Add a README file**, then create the repository.
 6. In the repository page, choose **Add file > Upload files**.
 7. Upload `app.py`, `requirements.txt`, `.gitignore`, and optionally `README.md`.
-   Do **not** upload `.streamlit/secrets.toml`, `.venv`, or Python cache files.
+   Do **not** upload `.streamlit/secrets.toml`, `chats/*.json`, `.venv`, or
+   Python cache files.
 8. Enter a commit message such as `Create beginner chat app`, then click
    **Commit changes**.
 9. Open the **Code** page and copy the repository URL, for example
@@ -208,13 +217,13 @@ for help.
 If uploading nested files through the browser is awkward, use **GitHub
 Desktop**: install it from [desktop.github.com](https://desktop.github.com/),
 sign in, add your project folder as a local repository, publish it to your
-GitHub account, and confirm `.streamlit/secrets.toml` is ignored before
-publishing.
+GitHub account, and confirm `.streamlit/secrets.toml` and `chats/*.json` are
+ignored before publishing.
 
 ### Verify before sharing
 
 1. Open the repository's **Code** page and check the file list.
-2. Confirm `.streamlit/secrets.toml` is absent.
+2. Confirm `.streamlit/secrets.toml` and any `chats/*.json` files are absent.
 3. Search the repository for `sk-or-` or your key; if a key was committed,
    revoke it in OpenRouter immediately and create a replacement. Deleting the
    file in a later commit does not erase it from Git history.
@@ -240,11 +249,11 @@ publishing.
 7. Copy your deployed app URL. Check that the URL works before sending it to the
    cohort.
 
-Each student should deploy with their **own** OpenRouter key. A publicly
-accessible app can let visitors make model requests using its configured key,
-which may consume that student's credits. Do not make an app public unless you
-understand and accept that risk; follow the instructor's sharing/access
-instructions.
+Each student should deploy with their **own** OpenRouter key. Visitors to the
+same deployed app can see and delete its saved chats. A publicly accessible app
+can also let visitors make model requests using its configured key, which may
+consume that student's credits. Streamlit Cloud may clear chat files when the
+app restarts. Follow the instructor's sharing/access instructions.
 
 ## Part 8: Share your work with the cohort
 
@@ -270,12 +279,14 @@ them.
   settings; a local secrets file is not uploaded to the cloud.
 - **Changes do not appear online:** commit/upload the new code to GitHub and
   wait for Streamlit to redeploy.
-- **The app lost chats:** that is expected in this starter. History is kept in
-  session state, not permanent storage.
+- **Local chats do not return:** confirm the `chats/` folder is beside `app.py`
+  and that its JSON files have not been deleted.
+- **Cloud chats disappear after a restart:** Streamlit Community Cloud's local
+  filesystem is temporary; this demo does not use durable storage.
 
 ## Optional next lessons
 
 After the basic app works, add one feature at a time: document uploads, a
-downloadable transcript, persistent database history, authentication, or more
+downloadable transcript, account-specific storage, authentication, or more
 careful context-window/token counting. Explain the privacy and cost trade-offs
 before sharing a multi-user app.

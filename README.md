@@ -5,18 +5,26 @@ with `openai/gpt-4o-mini`.
 
 ## What it includes
 
-- Chat messages and multiple chat threads stored in `st.session_state`.
+- Chat messages kept in `st.session_state` while active and saved as one JSON
+  file per conversation in `chats/`.
 - A sidebar for starting, switching, and deleting chats.
 - A system prompt, temperature, output-token limit, context-length limit, and
-  streaming setting.
+  streaming setting. Edit the system prompt and click **Save** to apply it for
+  the current session.
 - OpenRouter credentials read from Streamlit secrets or a local environment
   variable.
 - Light and dark appearance using Streamlit's built-in theme menu.
 
-**History is temporary.** It remains available during the current Streamlit
-browser session, but can disappear when the session ends or the page is
-refreshed. There is no database, upload feature, or account system in this
-starter version. Add those later as separate learning exercises.
+Chat history is restored after a page refresh from local JSON files. There is
+no database, upload feature, or account system in this starter version.
+Conversation files are excluded from Git by `.gitignore`.
+
+**Demo and deployment limitations:** all visitors to the same deployment use
+the same chat files, so they can see and delete one another's saved chats. The
+files are on the app server, not tied to an individual account. Streamlit
+Community Cloud's local filesystem is not durable, so chats can be lost when
+the app restarts or is redeployed. Do not use this storage design for private
+or important conversations.
 
 ## Quick local setup
 
@@ -51,13 +59,14 @@ excluded from Git by `.gitignore`.
    **Settings > Secrets**.
 4. Restart/redeploy the app, then send a test message.
 
-The app and chat history are per visitor session. If the deployed app is public,
-visitors can use its LLM connection and may consume your OpenRouter credits.
+If the deployed app is public, visitors can use its LLM connection and may
+consume your OpenRouter credits. They can also see and delete saved chats.
 Only share a deployed app with people you trust, or have each learner deploy
 their own app with their own key.
 
-## Student build guide
+## Student guides
 
-See [STUDENT_GUIDE.md](./STUDENT_GUIDE.md) for a step-by-step lesson, copyable
-prompts for building the app, GitHub account/repository setup, deployment, and
-how to share repository and app links with the cohort.
+- [Student Guide QA](./STUDENT_QA_GUIDE.md): simplified instructions for
+  non-coders, with coding-agent prompts for setup and publishing.
+- [Student Dev Guide](./STUDENT_DEV_GUIDE.md): the detailed, hands-on guide for
+  developers, with staged prompts and explanations.
