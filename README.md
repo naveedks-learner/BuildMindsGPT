@@ -1,81 +1,63 @@
 # BuildmindsGPT
 
-A Streamlit chat app using OpenRouter's Chat Completions API and
-`openai/gpt-4o-mini`, deployed on Streamlit Community Cloud.
+A beginner-friendly Streamlit chat app using OpenRouter's Chat Completions API
+with `openai/gpt-4o-mini`.
 
-## Features
+## What it includes
 
-- Persistent conversation and message history in Supabase Postgres.
-- New chats, history selection, and chat deletion in the sidebar.
-- Temperature, estimated context-window budget, maximum output tokens,
-  streaming, verbosity, and system-prompt settings.
-- Text, Markdown, CSV, and text-based PDF uploads for chat context.
-- Light and dark themes using Streamlit's native appearance control.
+- Chat messages and multiple chat threads stored in `st.session_state`.
+- A sidebar for starting, switching, and deleting chats.
+- A system prompt, temperature, output-token limit, context-length limit, and
+  streaming setting.
+- OpenRouter credentials read from Streamlit secrets or a local environment
+  variable.
+- Light and dark appearance using Streamlit's built-in theme menu.
 
-Uploads are limited to 10 MB per file and 50,000 extracted characters per
-message; scanned PDFs do not receive OCR. Extracted file text is stored with
-the corresponding user message in Supabase Postgres so it remains available
-when the conversation is reopened. Original binary files are not stored.
+**History is temporary.** It remains available during the current Streamlit
+browser session, but can disappear when the session ends or the page is
+refreshed. There is no database, upload feature, or account system in this
+starter version. Add those later as separate learning exercises.
 
-The context window uses the GPT-4o tokenizer plus a small per-message overhead
-estimate. Older turns are dropped first to leave room for the system prompt and
-requested maximum output. Settings and pending uploads are held in Streamlit
-session state; conversation history and extracted upload text are stored in
-Supabase Postgres. Uploaded document text is included with each new message
-while those files remain selected, and can be removed from the sidebar.
+## Quick local setup
 
-## Run locally
-
-1. Create and activate a virtual environment.
-2. Install dependencies:
+1. Install Python 3.11 or newer.
+2. Open a terminal in this project folder and install dependencies:
 
    ```powershell
    python -m pip install -r requirements.txt
    ```
 
-3. Configure secrets in `.streamlit/secrets.toml`:
-
-   ```toml
-   OPENROUTER_API_KEY = "your-key"
-   SUPABASE_DB_URL = "your-supabase-postgres-connection-string"
-   ```
-
-   Get the Postgres connection string from your Supabase project's **Connect**
-   settings. Use the transaction pooler connection string and keep the database
-   password private.
-4. Start the app:
-
-   ```powershell
-   streamlit run app.py
-   ```
-
-For local development without Supabase, set an explicit SQLite file path before
-launching:
-
-   ```powershell
-   $env:CHAT_DB_PATH = ".data\chat_history.sqlite3"
-   streamlit run app.py
-   ```
-
-SQLite is only intended for local testing; it is not persistent on Streamlit
-Community Cloud.
-
-## Deploy to Streamlit Community Cloud
-
-1. Push the project to a GitHub repository. Streamlit Community Cloud deploys
-   apps from GitHub; Hugging Face Spaces is not needed.
-2. In Streamlit Community Cloud, create an app from the repository and select
-   `app.py` as the entry point.
-3. In the app's **Settings > Secrets**, add:
+3. Create `.streamlit/secrets.toml` with your own OpenRouter key:
 
    ```toml
    OPENROUTER_API_KEY = "your-openrouter-key"
-   SUPABASE_DB_URL = "your-supabase-postgres-connection-string"
    ```
 
-4. Keep the Streamlit app private. This version does not have user accounts or
-   per-user history isolation, so users with access share the same conversations.
-5. Supabase stores chat history independently of Streamlit app restarts.
+4. Run the app:
 
-The app creates the required tables and index on its first run. Do not commit
-`.streamlit/secrets.toml`; it is excluded by `.gitignore`.
+   ```powershell
+   python -m streamlit run app.py
+   ```
+
+Never put an API key in `app.py` or a GitHub commit. The local secrets file is
+excluded from Git by `.gitignore`.
+
+## Deploy on Streamlit Community Cloud
+
+1. Push the project to a GitHub repository.
+2. Create an app on Streamlit Community Cloud from that repository and choose
+   `app.py` as the entry point.
+3. Add `OPENROUTER_API_KEY = "your-openrouter-key"` in the app's Streamlit
+   **Settings > Secrets**.
+4. Restart/redeploy the app, then send a test message.
+
+The app and chat history are per visitor session. If the deployed app is public,
+visitors can use its LLM connection and may consume your OpenRouter credits.
+Only share a deployed app with people you trust, or have each learner deploy
+their own app with their own key.
+
+## Student build guide
+
+See [STUDENT_GUIDE.md](./STUDENT_GUIDE.md) for a step-by-step lesson, copyable
+prompts for building the app, GitHub account/repository setup, deployment, and
+how to share repository and app links with the cohort.
