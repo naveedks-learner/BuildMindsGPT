@@ -7,10 +7,14 @@ with `openai/gpt-4o-mini`.
 
 - Chat messages kept in `st.session_state` while active and saved as one JSON
   file per conversation in `chats/`.
-- A sidebar for starting, switching, and deleting chats.
-- A system prompt, temperature, output-token limit, context-length limit, and
-  streaming setting. Edit the system prompt and click **Save** to apply it for
-  the current session.
+- A ChatGPT-inspired, left-aligned sidebar labeled **Recents** for starting,
+  switching, and deleting chats, with message avatars hidden for a cleaner
+  transcript. The center-pane content is left-aligned too.
+- A polished, vibrant layout with **Inference Settings** for the system prompt,
+  temperature, output-token limit, context length, and streaming. Click **Save**
+  to apply system-prompt edits for the current session.
+- A **Transaction Logs** inspector showing the latest Chat Completions request JSON and
+  response JSON (including raw stream chunks when streaming is enabled).
 - OpenRouter credentials read from Streamlit secrets or a local environment
   variable.
 - Light and dark appearance using Streamlit's built-in theme menu.
@@ -18,6 +22,9 @@ with `openai/gpt-4o-mini`.
 Chat history is restored after a page refresh from local JSON files. There is
 no database, upload feature, or account system in this starter version.
 Conversation files are excluded from Git by `.gitignore`.
+The JSON inspector is session-only and excludes API credentials. It displays
+the system prompt and messages included in the request; do not enter secrets
+into chat or prompt text.
 
 **Demo and deployment limitations:** all visitors to the same deployment use
 the same chat files, so they can see and delete one another's saved chats. The

@@ -29,13 +29,20 @@ cohort chat. Do not share your GitHub password, recovery codes, or tokens.
    > in `app.py` using OpenRouter's Chat Completions API with model
    > `openai/gpt-4o-mini`. Use `st.session_state` for active conversations and
    > save each conversation as a JSON file in a `chats/` folder so history
-   > survives refreshes. Add a sidebar to create, switch, and delete chats. Add
+   > survives refreshes. Add a ChatGPT-style sidebar with a "Recents" list to
+   > create, switch, and delete chats. Hide user and assistant avatars beside
+   > messages. Left-align the contents of both the sidebar and the center
+   > pane, while keeping light and dark themes. Add
    > settings for temperature, maximum output tokens, recent context length,
    > and streaming on/off. Add a system prompt editor with a nearby Save button;
-   > apply prompt edits only after Save is clicked. Read
-   > `OPENROUTER_API_KEY` from Streamlit secrets, never hard-code it. Keep this
-   > beginner-friendly and do not add a database, accounts, file uploads, or
-   > extra packages. Make `.gitignore` exclude chat JSON files,
+   > apply prompt edits only after Save is clicked. Read `OPENROUTER_API_KEY`
+   > from Streamlit secrets, never hard-code it. Use a polished, vibrant
+   > layout. Name the control section "Inference Settings" and add a separate
+   > "Transaction Logs" section showing the latest request JSON and response JSON,
+   > including streamed response chunks when streaming is on. Never show API
+   > credentials in this inspector. Keep this beginner-friendly and do not add
+   > a database, accounts, file uploads, or extra packages. Make `.gitignore`
+   > exclude chat JSON files,
    > `.streamlit/secrets.toml`, `.env`, virtual environments, and Python cache
    > files. Explain that all visitors to one deployment can see/delete chats
    > and Streamlit Cloud may clear local files after a restart.
@@ -70,7 +77,9 @@ feature at a time instead of generating the files.
    then retry.
 4. In the browser, send a message, create a second chat, switch between chats,
    and try the settings. Edit the system prompt and click **Save** before testing
-   it. Refresh the browser and confirm the saved chats return.
+   it. Open **Transaction Logs** to inspect the request and response JSON. The inspector
+   shows the system prompt and chat messages sent to the model, so do not type
+   secrets there. Refresh the browser and confirm the saved chats return.
 5. To ask for help with an error, paste the error into the coding assistant
    **after removing API keys and other secrets**. You do not need a separate
    error-help prompt.

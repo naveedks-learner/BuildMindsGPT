@@ -6,12 +6,16 @@ put the project on GitHub, and deploy it to Streamlit Community Cloud.
 
 ## What you will build
 
-- A chat screen with multiple chats and a history list.
+- A chat screen with multiple chats and a **Recents** list in a ChatGPT-style
+  sidebar; the sidebar and center-pane content are left-aligned, and messages
+  display without user/assistant avatars.
 - `st.session_state` for active chats and one JSON file per conversation in a
   local `chats/` folder.
 - OpenRouter's Chat Completions API using `openai/gpt-4o-mini`.
 - A system prompt, temperature, maximum output tokens, recent-message context
   limit, and a streaming on/off switch.
+- A vibrant interface with **Inference Settings** and a **Settings** inspector
+  for request and response JSON.
 - A GitHub repository and a deployed Streamlit app.
 
 Chat history is restored from JSON files after a browser refresh. All visitors
@@ -98,18 +102,26 @@ assistant any errors you see, but remove API keys and other secrets first.
 > language. Use `st.session_state` for a dictionary of conversations and the
 > active conversation ID. Save each conversation as a JSON file in a local
 > `chats/` folder and restore those files when a new session starts. Do not add
-> a database, user accounts, file uploads, custom CSS, or extra packages. Keep
-> the API key out of source code. Explain that everyone using one deployment
-> shares chat history and Streamlit Cloud may clear local files on restart.
+> a database, user accounts, file uploads, or extra packages. Keep the API key
+> out of source code. Explain that everyone using one deployment shares chat
+> history and Streamlit Cloud may clear local files on restart. Give the
+> interface a polished, vibrant appearance without external font or JavaScript
+> dependencies. Name model controls "Inference Settings"; add a separate
+> "Transaction Logs" inspector for the latest request JSON and response JSON.
+> Label the sidebar chat list "Recents", hide chat-message avatars, and keep
+> the sidebar and center-pane content left-aligned while keeping both light and
+> dark themes working.
 
 ### Prompt 2 — Build chat and history
 
 > Now create `app.py` from that plan. Include a chat input and user/assistant
-> message display with `st.chat_message`. Add a sidebar button to start a new
-> chat, buttons to switch between chat histories, and a way to delete the
+> message display with `st.chat_message`, but hide the user and assistant
+> avatars. Add a sidebar button to start a new chat, buttons under "Recents" to
+> switch between chat histories, and a way to delete the
 > current chat. Keep active state in `st.session_state`, and load/save each
 > conversation as JSON under `chats/` so it returns after a refresh. Initialize
-> state safely so Streamlit reruns work. Explain the code after showing it.
+> state safely so Streamlit reruns work. Add the vibrant layout and keep the
+> request/response inspector readable. Explain the code after showing it.
 
 ### Prompt 3 — Connect OpenRouter safely
 
@@ -129,8 +141,10 @@ assistant any errors you see, but remove API keys and other secrets first.
 > `stream=True`. When streaming is off, make a normal non-streaming request.
 > Put a Save button next to the system prompt editor; keep edits as a draft
 > until Save is clicked, then use the saved prompt for future requests in this
-> session. Keep the code beginner-readable and explain how the settings affect
-> the request.
+> session. Label the controls "Inference Settings" and add a separate
+> "Transaction Logs" section showing the latest request and response JSON. Do not
+> include API credentials. Keep the code beginner-readable and explain how the
+> settings affect the request.
 
 ### Prompt 5 — Review and test
 
@@ -138,7 +152,9 @@ assistant any errors you see, but remove API keys and other secrets first.
 > Check that messages survive Streamlit reruns within one browser session, that
 > separate chats do not mix, and that only the configured recent messages are
 > sent to the model. Check that system-prompt edits are not applied until Save
-> is clicked. Check that the API key cannot be committed accidentally.
+> is clicked. Check that the inspector reflects the actual request and response
+> and never includes credentials. Check that the API key cannot be committed
+> accidentally.
 > List any problems first, then suggest the smallest corrections. Do not add a
 > database or change the JSON-file persistence design.
 
